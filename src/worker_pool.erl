@@ -46,7 +46,7 @@
                 options = #{} :: options(),
                 free_workers = [] :: [pid()],
                 busy_workers = [] :: [pid()],
-                requests = [] :: [request()]}).
+                requests :: queue:queue(request())}).
 
 -spec default_options() -> options().
 default_options() ->
@@ -81,7 +81,8 @@ release(PoolRef, Worker) ->
 
 init([WorkerSpec, Opts]) ->
   State = #state{worker_spec = WorkerSpec,
-                 options = Opts},
+                 options = Opts,
+                 requests = queue:new()},
   {ok, State}.
 
 handle_call(acquire, _From,
@@ -103,24 +104,22 @@ handle_call(acquire, From, State = #state{free_workers = [],
                                           requests = Requests}) ->
   #{request_timeout := Delay} = State#state.options,
   {ok, Timer} = timer:send_after(Delay, {expire_request, From}),
-  State2 = State#state{requests = [{From, Timer} | Requests]},
+  State2 = State#state{requests = queue:in({From, Timer}, Requests)},
   {noreply, State2};
 
-handle_call({release, Worker}, _From,
-            State = #state{free_workers = FreeWorkers,
-                           busy_workers = BusyWorkers}) ->
+handle_call({release, Worker}, _From, State) ->
   Pred = fun (W) -> W == Worker end,
-  {[_], BusyWorkers2} = lists:partition(Pred, BusyWorkers),
-  State2 = State#state{free_workers = [Worker | FreeWorkers],
+  {[_], BusyWorkers2} = lists:partition(Pred, State#state.busy_workers),
+  State2 = State#state{free_workers = [Worker | State#state.free_workers],
                        busy_workers = BusyWorkers2},
-  State3 = case State2#state.requests of
-             [] ->
-               State2;
-             [{AFrom, Timer} | Requests] ->
-               timer:cancel(Timer),
-               gen_server:reply(AFrom, {ok, Worker}),
-               State2#state{requests = Requests}
-           end,
+  State3 = case queue:out(State#state.requests) of
+    {{value, {AFrom, Timer}}, Requests2} ->
+      timer:cancel(Timer),
+      gen_server:reply(AFrom, {ok, Worker}),
+      State2#state{requests = Requests2};
+    {empty, _} ->
+      State2
+  end,
   {reply, ok, State3};
 
 handle_call(stats, _From, State) ->
@@ -141,12 +140,18 @@ handle_cast(Request, State) ->
   ?LOG_WARNING("unhandled cast ~p~n", [Request]),
   {noreply, State}.
 
-handle_info({expire_request, From},
-            State = #state{requests = Requests}) ->
-  Pred = fun ({F, _}) -> F == From end,
-  {[{AFrom, Timer}], Requests2} = lists:partition(Pred, Requests),
-  timer:cancel(Timer),
-  gen_server:reply(AFrom, {error, timeout}),
+handle_info({expire_request, From}, State) ->
+  Fun = fun ({AFrom, Timer}) ->
+            case AFrom == From of
+              true ->
+                timer:cancel(Timer),
+                gen_server:reply(AFrom, {error, timeout}),
+                false;
+              false ->
+                true
+            end
+        end,
+  Requests2 = queue:filter(Fun, State#state.requests),
   State2 = State#state{requests = Requests2},
   {noreply, State2};
 
