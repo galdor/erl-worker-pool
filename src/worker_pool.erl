@@ -20,7 +20,7 @@
 
 -export([default_options/0, start_link/2, start_link/3, stop/1,
          stats/1, acquire/1, release/2,
-         init/1, handle_call/3, handle_cast/2, handle_info/2]).
+         init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2]).
 
 -export_type([options/0, pool_name/0, pool_ref/0,
               worker/0, worker_spec/0, stats/0]).
@@ -85,6 +85,17 @@ init([WorkerSpec, Opts]) ->
                  options = Opts,
                  requests = queue:new()},
   {ok, State}.
+
+terminate(_Reason, #state{free_workers = FreeWorkers,
+                          busy_workers = BusyWorkers,
+                          requests = Requests}) ->
+  lists:foreach(fun ({From, Timer}) ->
+                    gen_server:reply(From, {error, stopping}),
+                    timer:cancel(Timer)
+                end, queue:to_list(Requests)),
+  lists:foreach(fun gen_server:stop/1, FreeWorkers),
+  lists:foreach(fun gen_server:stop/1, BusyWorkers),
+  ok.
 
 handle_call(acquire, _From,
             State = #state{free_workers = [Worker | FreeWorkers],
