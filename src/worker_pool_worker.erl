@@ -15,3 +15,4 @@
 -module(worker_pool_worker).
 
 -callback start_link(Args :: list()) -> {ok, pid()} | {error, term()}.
+-callback stop(Worker :: pid()) -> ok.

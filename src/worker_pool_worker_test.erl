@@ -17,11 +17,14 @@
 -behaviour(worker_pool_worker).
 -behaviour(gen_server).
 
--export([start_link/1,
+-export([start_link/1, stop/1,
          init/1, handle_call/3, handle_cast/2]).
 
 start_link(Args) ->
   gen_server:start_link(?MODULE, Args, []).
+
+stop(Pid) ->
+  gen_server:stop(Pid).
 
 init([]) ->
   {ok, undefined}.

@@ -86,15 +86,16 @@ init([WorkerSpec, Opts]) ->
                  requests = queue:new()},
   {ok, State}.
 
-terminate(_Reason, #state{free_workers = FreeWorkers,
+terminate(_Reason, #state{worker_spec = {M, _},
+                          free_workers = FreeWorkers,
                           busy_workers = BusyWorkers,
                           requests = Requests}) ->
   lists:foreach(fun ({From, Timer}) ->
                     gen_server:reply(From, {error, stopping}),
                     timer:cancel(Timer)
                 end, queue:to_list(Requests)),
-  lists:foreach(fun gen_server:stop/1, FreeWorkers),
-  lists:foreach(fun gen_server:stop/1, BusyWorkers),
+  lists:foreach(fun M:stop/1, FreeWorkers),
+  lists:foreach(fun M:stop/1, BusyWorkers),
   ok.
 
 handle_call(acquire, _From,
