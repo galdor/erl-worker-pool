@@ -26,6 +26,8 @@ start_link(Args) ->
 init([]) ->
   {ok, undefined}.
 
+handle_call(die, _From, State) ->
+  {stop, died, ok, State};
 handle_call(_Request, _From, State) ->
   {noreply, State}.
 

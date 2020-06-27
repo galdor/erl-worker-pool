@@ -80,6 +80,7 @@ release(PoolRef, Worker) ->
   gen_server:call(PoolRef, {release, Worker}).
 
 init([WorkerSpec, Opts]) ->
+  process_flag(trap_exit, true),
   State = #state{worker_spec = WorkerSpec,
                  options = Opts,
                  requests = queue:new()},
@@ -110,17 +111,26 @@ handle_call(acquire, From, State = #state{free_workers = [],
 handle_call({release, Worker}, _From, State) ->
   Pred = fun (W) -> W == Worker end,
   {[_], BusyWorkers2} = lists:partition(Pred, State#state.busy_workers),
-  State2 = case queue:out(State#state.requests) of
-             {{value, {AFrom, Timer}}, Requests2} ->
-               timer:cancel(Timer),
-               gen_server:reply(AFrom, {ok, Worker}),
-               %% the worker stays in the busy list
-               State#state{requests = Requests2};
-             {empty, _} ->
-               State#state{free_workers = [Worker | State#state.free_workers],
-                           busy_workers = BusyWorkers2}
-           end,
-  {reply, ok, State2};
+  case is_process_alive(Worker) of
+    true ->
+      State2 = case queue:out(State#state.requests) of
+                 {{value, {AFrom, Timer}}, Requests2} ->
+                   timer:cancel(Timer),
+                   gen_server:reply(AFrom, {ok, Worker}),
+                   %% The worker stays in the busy list
+                   State#state{requests = Requests2};
+                 {empty, _} ->
+                   FreeWorkers = State#state.free_workers,
+                   State#state{free_workers = [Worker | FreeWorkers],
+                               busy_workers = BusyWorkers2}
+               end,
+      {reply, ok, State2};
+    false->
+      %% If the worker exited before being released, it does not go back to
+      %% the free list.
+      State2 = State#state{busy_workers = BusyWorkers2},
+      {reply, ok, State2}
+    end;
 
 handle_call(stats, _From, State) ->
   #{max_nb_workers := MaxNbWorkers} = State#state.options,
@@ -154,6 +164,17 @@ handle_info({expire_request, From}, State) ->
   Requests2 = queue:filter(Fun, State#state.requests),
   State2 = State#state{requests = Requests2},
   {noreply, State2};
+
+handle_info({'EXIT', Worker, _Reason}, State) ->
+  Pred = fun (W) -> W == Worker end,
+  case lists:partition(Pred, State#state.free_workers) of
+    {[_W], FreeWorkers} ->
+      %% The worker was free, just remove it
+      {noreply, State#state{free_workers = FreeWorkers}};
+    {[], _} ->
+      %% The worker is busy, it will be removed when released
+      {noreply, State}
+  end;
 
 handle_info(Info, _State) ->
   ?LOG_WARNING("unhandled info ~p~n", [Info]).

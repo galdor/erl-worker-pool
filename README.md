@@ -1,5 +1,5 @@
 # Project
-**TODO**
+An experimental worker pool library.
 
 # Contact
 If you find a bug or have any question, feel free to open a GitHub issue or to
