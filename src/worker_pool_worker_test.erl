@@ -31,15 +31,12 @@ init([]) ->
 
 handle_call({echo, Value}, _From, State) ->
   {reply, Value, State};
-handle_call({throw, Value}, _From, State) ->
-  throw(Value),
-  {noreply, State};
-handle_call({exit, Value}, _From, State) ->
-  exit(Value),
-  {noreply, State};
-handle_call({error, Value}, _From, State) ->
-  error(Value),
-  {noreply, State};
+handle_call({throw, Value}, _From, _State) ->
+  throw(Value);
+handle_call({exit, Value}, _From, _State) ->
+  exit(Value);
+handle_call({error, Value}, _From, _State) ->
+  error(Value);
 handle_call(die, _From, State) ->
   {stop, died, ok, State};
 handle_call(_Request, _From, State) ->
