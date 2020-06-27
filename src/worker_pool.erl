@@ -110,17 +110,17 @@ handle_call(acquire, From, State = #state{free_workers = [],
 handle_call({release, Worker}, _From, State) ->
   Pred = fun (W) -> W == Worker end,
   {[_], BusyWorkers2} = lists:partition(Pred, State#state.busy_workers),
-  State2 = State#state{free_workers = [Worker | State#state.free_workers],
-                       busy_workers = BusyWorkers2},
-  State3 = case queue:out(State#state.requests) of
-    {{value, {AFrom, Timer}}, Requests2} ->
-      timer:cancel(Timer),
-      gen_server:reply(AFrom, {ok, Worker}),
-      State2#state{requests = Requests2};
-    {empty, _} ->
-      State2
-  end,
-  {reply, ok, State3};
+  State2 = case queue:out(State#state.requests) of
+             {{value, {AFrom, Timer}}, Requests2} ->
+               timer:cancel(Timer),
+               gen_server:reply(AFrom, {ok, Worker}),
+               %% the worker stays in the busy list
+               State#state{requests = Requests2};
+             {empty, _} ->
+               State#state{free_workers = [Worker | State#state.free_workers],
+                           busy_workers = BusyWorkers2}
+           end,
+  {reply, ok, State2};
 
 handle_call(stats, _From, State) ->
   #{max_nb_workers := MaxNbWorkers} = State#state.options,
