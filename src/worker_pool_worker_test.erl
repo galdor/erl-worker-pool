@@ -31,6 +31,8 @@ init([]) ->
 
 handle_call(die, _From, State) ->
   {stop, died, ok, State};
+handle_call({echo, Value}, _From, State) ->
+  {reply, Value, State};
 handle_call(_Request, _From, State) ->
   {noreply, State}.
 

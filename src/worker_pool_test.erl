@@ -34,6 +34,8 @@ pool_test_() ->
    end,
    [fun start_stop/0,
     fun stop/0,
+    fun with_worker/0,
+    fun with_worker_crash/0,
     fun timeout/0,
     fun stats/0,
     fun crash_while_busy/0,
@@ -53,6 +55,38 @@ stop() ->
   worker_pool:stop(Pool),
   ?assertNot(is_process_alive(W1)),
   ?assertNot(is_process_alive(W2)).
+
+with_worker() ->
+  Pool = test_pool([], #{max_nb_workers => 10}),
+  ?assertEqual(ok, worker_pool:with_worker(worker_pool_test,
+                                           fun (_W) -> ok end)),
+  ?assertError(crash, worker_pool:with_worker(worker_pool_test,
+                                              fun (_W) -> error(crash) end)),
+  ?assertExit(crash, worker_pool:with_worker(worker_pool_test,
+                                             fun (_W) -> exit(crash) end)),
+  ?assertThrow(crash, worker_pool:with_worker(worker_pool_test,
+                                              fun (_W) -> throw(crash) end)),
+  ?assertEqual(#{nb_workers => 1,
+                 max_nb_workers => 10,
+                 nb_free_workers => 1,
+                 nb_busy_workers => 0},
+               worker_pool:stats(worker_pool_test)),
+  worker_pool:stop(Pool).
+
+with_worker_crash() ->
+  Pool = test_pool([], #{max_nb_workers => 10}),
+  ?assertExit({noproc, {gen_server, call, _}},
+              worker_pool:with_worker(worker_pool_test,
+                                      fun (W) ->
+                                          kill_worker(W),
+                                          gen_server:call(W, {echo, foo})
+                                      end)),
+  ?assertEqual(#{nb_workers => 0,
+                 max_nb_workers => 10,
+                 nb_free_workers => 0,
+                 nb_busy_workers => 0},
+               worker_pool:stats(worker_pool_test)),
+  worker_pool:stop(Pool).
 
 timeout() ->
   Pool = test_pool([], #{max_nb_workers => 2, request_timeout => 100}),

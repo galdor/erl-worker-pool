@@ -19,7 +19,7 @@
 -behaviour(gen_server).
 
 -export([default_options/0, start_link/2, start_link/3, stop/1,
-         stats/1, acquire/1, release/2,
+         stats/1, acquire/1, release/2, with_worker/2,
          init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2]).
 
 -export_type([options/0, pool_name/0, pool_ref/0,
@@ -78,6 +78,20 @@ acquire(PoolRef) ->
 -spec release(pool_ref(), worker()) -> ok.
 release(PoolRef, Worker) ->
   gen_server:call(PoolRef, {release, Worker}).
+
+-spec with_worker(pool_ref(), fun((worker()) -> term())) ->
+        {error, term()} | term().
+with_worker(PoolRef, Fun) ->
+  case acquire(PoolRef) of
+    {ok, Worker} ->
+      try
+        Fun(Worker)
+      after
+        ok = release(PoolRef, Worker)
+      end;
+    {error, Reason} ->
+      {error, Reason}
+  end.
 
 init([WorkerSpec, Opts]) ->
   process_flag(trap_exit, true),
