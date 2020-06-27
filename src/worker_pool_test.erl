@@ -22,11 +22,13 @@ pool_test_() ->
        error_logger:tty(false)
    end,
    fun (_) ->
-       case whereis(worker_pool_test) of
-         undefined ->
+       try
+         worker_pool:stop(worker_pool_test)
+       catch
+         exit:{normal, _} ->
            ok;
-         Pid ->
-           gen_server:stop(Pid)
+         exit:noproc ->
+           ok
        end,
        error_logger:tty(true)
    end,
