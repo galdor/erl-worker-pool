@@ -35,6 +35,7 @@ pool_test_() ->
    [fun start_stop/0,
     fun stop/0,
     fun with_worker/0,
+    fun with_worker_kill/0,
     fun with_worker_crash/0,
     fun timeout/0,
     fun stats/0,
@@ -60,12 +61,12 @@ with_worker() ->
   Pool = test_pool([], #{max_nb_workers => 10}),
   ?assertEqual(ok, worker_pool:with_worker(worker_pool_test,
                                            fun (_W) -> ok end)),
-  ?assertError(crash, worker_pool:with_worker(worker_pool_test,
-                                              fun (_W) -> error(crash) end)),
-  ?assertExit(crash, worker_pool:with_worker(worker_pool_test,
-                                             fun (_W) -> exit(crash) end)),
   ?assertThrow(crash, worker_pool:with_worker(worker_pool_test,
                                               fun (_W) -> throw(crash) end)),
+  ?assertExit(crash, worker_pool:with_worker(worker_pool_test,
+                                             fun (_W) -> exit(crash) end)),
+  ?assertError(crash, worker_pool:with_worker(worker_pool_test,
+                                              fun (_W) -> error(crash) end)),
   ?assertEqual(#{nb_workers => 1,
                  max_nb_workers => 10,
                  nb_free_workers => 1,
@@ -73,7 +74,7 @@ with_worker() ->
                worker_pool:stats(worker_pool_test)),
   worker_pool:stop(Pool).
 
-with_worker_crash() ->
+with_worker_kill() ->
   Pool = test_pool([], #{max_nb_workers => 10}),
   ?assertExit({noproc, {gen_server, call, _}},
               worker_pool:with_worker(worker_pool_test,
@@ -81,6 +82,30 @@ with_worker_crash() ->
                                           kill_worker(W),
                                           gen_server:call(W, {echo, foo})
                                       end)),
+  ?assertEqual(#{nb_workers => 0,
+                 max_nb_workers => 10,
+                 nb_free_workers => 0,
+                 nb_busy_workers => 0},
+               worker_pool:stats(worker_pool_test)),
+  worker_pool:stop(Pool).
+
+with_worker_crash() ->
+  Pool = test_pool([], #{max_nb_workers => 10}),
+  ?assertExit({{bad_return_value, foo}, {gen_server, call, _}},
+              worker_pool:with_worker(worker_pool_test,
+                                      fun (W) ->
+                                          gen_server:call(W, {throw, foo})
+                                      end)),
+  ?assertExit({foo, {gen_server, call, _}},
+               worker_pool:with_worker(worker_pool_test,
+                                       fun (W) ->
+                                           gen_server:call(W, {exit, foo})
+                                       end)),
+  ?assertExit({{foo, _WorkerStack}, _Stack},
+               worker_pool:with_worker(worker_pool_test,
+                                       fun (W) ->
+                                           gen_server:call(W, {error, foo})
+                                       end)),
   ?assertEqual(#{nb_workers => 0,
                  max_nb_workers => 10,
                  nb_free_workers => 0,
