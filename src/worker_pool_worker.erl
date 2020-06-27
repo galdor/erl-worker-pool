@@ -12,22 +12,6 @@
 %% OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 %% PERFORMANCE OF THIS SOFTWARE.
 
--module(worker_pool_worker_test).
+-module(worker_pool_worker).
 
--behaviour(worker_pool_worker).
--behaviour(gen_server).
-
--export([start_link/1,
-         init/1, handle_call/3, handle_cast/2]).
-
-start_link(Args) ->
-  gen_server:start_link(?MODULE, Args, []).
-
-init([]) ->
-  {ok, undefined}.
-
-handle_call(_Request, _From, State) ->
-  {noreply, State}.
-
-handle_cast(_Request, State) ->
-  {noreply, State}.
+-callback start_link(Args :: list()) -> {ok, pid()} | {error, term()}.

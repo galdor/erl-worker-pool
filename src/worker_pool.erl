@@ -33,7 +33,7 @@
                   | {via, atom(), term()} | pid().
 
 -type worker() :: pid().
--type worker_spec() :: {module(), Fun :: atom(), Args :: list()}.
+-type worker_spec() :: {module(), Args :: list()}.
 
 -type stats() :: #{nb_workers := non_neg_integer(),
                    max_nb_workers := pos_integer(),
@@ -92,12 +92,12 @@ handle_call(acquire, _From,
                        busy_workers = [Worker | BusyWorkers]},
   {reply, {ok, Worker}, State2};
 handle_call(acquire, _From,
-            State = #state{worker_spec = {M, F, A},
+            State = #state{worker_spec = {M, A},
                            options = #{max_nb_workers := MaxNbWorkers},
                            free_workers = [],
                            busy_workers = BusyWorkers}) when
     length(BusyWorkers) < MaxNbWorkers ->
-  Worker = spawn_link(M, F, [A]),
+  {ok, Worker} = M:start_link(A),
   State2 = State#state{busy_workers = [Worker | BusyWorkers]},
   {reply, {ok, Worker}, State2};
 handle_call(acquire, From, State = #state{free_workers = [],
