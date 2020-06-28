@@ -40,7 +40,8 @@ pool_test_() ->
     fun timeout/0,
     fun stats/0,
     fun crash_while_busy/0,
-    fun crash_while_free/0]}.
+    fun crash_while_free/0,
+    fun stress/0]}.
 
 start_stop() ->
   Pool = test_pool([], #{}),
@@ -191,6 +192,35 @@ crash_while_free() ->
                worker_pool:stats(worker_pool_test)),
   worker_pool:stop(Pool).
 
+stress() ->
+  NbWorkers = 10,
+  NbClients = 1000,
+  Duration = 1000,
+  AcquisitionDuration = 50,
+  Pool = test_pool([], #{max_nb_workers => NbWorkers}),
+  ClientFun = fun F() ->
+                  case worker_pool:acquire(worker_pool_test) of
+                    {ok, Worker} ->
+                      gen_server:call(Worker, {echo, hello}),
+                      timer:sleep(AcquisitionDuration),
+                      worker_pool:release(worker_pool_test, Worker),
+                      F();
+                    {error, timeout} ->
+                      F()
+                  end
+              end,
+  Clients = [spawn(ClientFun) || _ <- lists:seq(1, NbClients)],
+  timer:sleep(Duration),
+  lists:foreach(fun (Client) ->
+                    monitor(process, Client),
+                    exit(Client, stop),
+                    receive
+                      {'DOWN', _, process, Client, _} ->
+                        ok
+                    end
+                end, Clients),
+  worker_pool:stop(Pool).
+
 test_pool(Args, ExtraOpts) ->
   WorkerSpec = {worker_pool_worker_test, Args},
   Opts = maps:merge(#{max_nb_workers => 10,
@@ -201,7 +231,7 @@ test_pool(Args, ExtraOpts) ->
   Pool.
 
 kill_worker(Worker) ->
-    erlang:monitor(process, Worker),
+    monitor(process, Worker),
     gen_server:call(Worker, die),
     receive
       {'DOWN', _, process, Worker, _} ->
