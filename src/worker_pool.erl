@@ -40,7 +40,7 @@
                    nb_free_workers := non_neg_integer(),
                    nb_busy_workers := non_neg_integer()}.
 
--type request() :: {From :: {pid(), term()}, timer:tref()}.
+-type request() :: {From :: {pid(), term()}, Timer :: reference()}.
 
 -record(state, {worker_spec :: worker_spec(),
                 options = #{} :: options(),
@@ -106,7 +106,7 @@ terminate(_Reason, #state{worker_spec = {M, _},
                           requests = Requests}) ->
   lists:foreach(fun ({From, Timer}) ->
                     gen_server:reply(From, {error, stopping}),
-                    timer:cancel(Timer)
+                    erlang:cancel_timer(Timer)
                 end, queue:to_list(Requests)),
   lists:foreach(fun M:stop/1, FreeWorkers),
   lists:foreach(fun M:stop/1, BusyWorkers),
@@ -130,7 +130,7 @@ handle_call(acquire, _From,
 handle_call(acquire, From, State = #state{free_workers = [],
                                           requests = Requests}) ->
   #{request_timeout := Delay} = State#state.options,
-  {ok, Timer} = timer:send_after(Delay, {expire_request, From}),
+  Timer = erlang:send_after(Delay, self(), {expire_request, From}),
   State2 = State#state{requests = queue:in({From, Timer}, Requests)},
   {noreply, State2};
 
@@ -141,7 +141,7 @@ handle_call({release, Worker}, _From, State) ->
     true ->
       State2 = case queue:out(State#state.requests) of
                  {{value, {AFrom, Timer}}, Requests2} ->
-                   timer:cancel(Timer),
+                   erlang:cancel_timer(Timer),
                    gen_server:reply(AFrom, {ok, Worker}),
                    %% The worker stays in the busy list
                    State#state{requests = Requests2};
@@ -180,7 +180,7 @@ handle_info({expire_request, From}, State) ->
   Fun = fun ({AFrom, Timer}) ->
             case AFrom == From of
               true ->
-                timer:cancel(Timer),
+                erlang:cancel_timer(Timer),
                 gen_server:reply(AFrom, {error, timeout}),
                 false;
               false ->
