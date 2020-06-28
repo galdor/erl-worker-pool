@@ -38,7 +38,8 @@
 -type stats() :: #{nb_workers := non_neg_integer(),
                    max_nb_workers := pos_integer(),
                    nb_free_workers := non_neg_integer(),
-                   nb_busy_workers := non_neg_integer()}.
+                   nb_busy_workers := non_neg_integer(),
+                   nb_requests := non_neg_integer()}.
 
 -type request() :: {From :: {pid(), term()}, Timer :: reference()}.
 
@@ -165,7 +166,8 @@ handle_call(stats, _From, State) ->
   Stats = #{nb_workers => NbFreeWorkers + NbBusyWorkers,
             max_nb_workers => MaxNbWorkers,
             nb_free_workers => NbFreeWorkers,
-            nb_busy_workers => NbBusyWorkers},
+            nb_busy_workers => NbBusyWorkers,
+            nb_requests => queue:len(State#state.requests)},
   {reply, Stats, State};
 
 handle_call(Request, From, State) ->
