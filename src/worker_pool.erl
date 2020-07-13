@@ -18,7 +18,7 @@
 
 -behaviour(gen_server).
 
--export([default_options/0, start_link/2, start_link/3, stop/1,
+-export([default_options/0, options/1, start_link/2, start_link/3, stop/1,
          stats/1, acquire/1, release/2, with_worker/2,
          init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2]).
 
@@ -53,6 +53,10 @@
 default_options() ->
   #{max_nb_workers => 10,
     request_timeout => 1000}.
+
+-spec options(options()) -> options().
+options(Options) ->
+  maps:merge(default_options(), Options).
 
 -spec start_link(pool_name(), worker_spec()) -> Result when
     Result :: {ok, pid()} | ignore | {error, term()}.
