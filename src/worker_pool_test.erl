@@ -225,13 +225,13 @@ stress() ->
                 end, Clients),
   worker_pool:stop(Pool).
 
-test_pool(Args, ExtraOpts) ->
+test_pool(Args, ExtraOptions) ->
   WorkerSpec = {worker_pool_worker_test, Args},
-  Opts = maps:merge(#{max_nb_workers => 10,
-                      request_timeout => 1000},
-                    ExtraOpts),
+  Options = maps:merge(#{max_nb_workers => 10,
+                         request_timeout => 1000},
+                       ExtraOptions),
   {ok, Pool} = worker_pool:start_link({local, worker_pool_test},
-                                      WorkerSpec, Opts),
+                                      WorkerSpec, Options),
   Pool.
 
 kill_worker(Worker) ->

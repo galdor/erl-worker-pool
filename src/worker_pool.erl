@@ -65,8 +65,8 @@ start_link(Name, WorkerSpec) ->
 
 -spec start_link(pool_name(), worker_spec(), options()) -> Result when
     Result :: {ok, pid()} | ignore | {error, term()}.
-start_link(Name, WorkerSpec, Opts) ->
-  gen_server:start_link(Name, ?MODULE, [WorkerSpec, Opts], []).
+start_link(Name, WorkerSpec, Options) ->
+  gen_server:start_link(Name, ?MODULE, [WorkerSpec, Options], []).
 
 -spec stop(pool_ref()) -> ok.
 stop(PoolRef) ->
@@ -98,10 +98,10 @@ with_worker(PoolRef, Fun) ->
       {error, Reason}
   end.
 
-init([WorkerSpec, Opts]) ->
+init([WorkerSpec, Options]) ->
   process_flag(trap_exit, true),
   State = #state{worker_spec = WorkerSpec,
-                 options = Opts,
+                 options = Options,
                  requests = queue:new()},
   {ok, State}.
 
