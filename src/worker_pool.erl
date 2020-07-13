@@ -23,7 +23,7 @@
          init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2]).
 
 -export_type([options/0, pool_name/0, pool_ref/0,
-              worker/0, worker_spec/0, stats/0]).
+              worker/0, worker_spec/0, worker_fun/0, stats/0]).
 
 -type options() :: #{max_nb_workers => pos_integer(),
                      request_timeout => pos_integer()}.
@@ -34,6 +34,7 @@
 
 -type worker() :: pid().
 -type worker_spec() :: {module(), Args :: list()}.
+-type worker_fun() :: fun((worker()) -> ok | {ok, term()} | {error, term()}).
 
 -type stats() :: #{nb_workers := non_neg_integer(),
                    max_nb_workers := pos_integer(),
@@ -84,8 +85,8 @@ acquire(PoolRef) ->
 release(PoolRef, Worker) ->
   gen_server:call(PoolRef, {release, Worker}).
 
--spec with_worker(pool_ref(), fun((worker()) -> term())) ->
-        {error, term()} | term().
+-spec with_worker(pool_ref(), worker_fun()) ->
+        ok | {ok, term()} | {error, term()}.
 with_worker(PoolRef, Fun) ->
   case acquire(PoolRef) of
     {ok, Worker} ->
