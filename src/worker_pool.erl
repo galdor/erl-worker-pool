@@ -179,12 +179,12 @@ handle_call(stats, _From, State) ->
             nb_requests => queue:len(State#state.requests)},
   {reply, Stats, State};
 
-handle_call(Request, From, State) ->
-  ?LOG_WARNING("unhandled call ~p from ~p~n", [Request, From]),
+handle_call(Msg, From, State) ->
+  ?LOG_WARNING("unhandled call ~p from ~p~n", [Msg, From]),
   {noreply, State}.
 
-handle_cast(Request, State) ->
-  ?LOG_WARNING("unhandled cast ~p~n", [Request]),
+handle_cast(Msg, State) ->
+  ?LOG_WARNING("unhandled cast ~p~n", [Msg]),
   {noreply, State}.
 
 handle_info({expire_request, From}, State) ->
@@ -213,5 +213,6 @@ handle_info({'EXIT', Worker, _Reason}, State) ->
       {noreply, State}
   end;
 
-handle_info(Info, _State) ->
-  ?LOG_WARNING("unhandled info ~p~n", [Info]).
+handle_info(Msg, State) ->
+  ?LOG_WARNING("unhandled info ~p~n", [Msg]),
+  {noreply, State}.
