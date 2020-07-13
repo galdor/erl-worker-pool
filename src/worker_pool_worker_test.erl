@@ -26,6 +26,8 @@ start_link(Args) ->
 stop(Pid) ->
   gen_server:stop(Pid).
 
+init([{error, Value}]) ->
+  {stop, Value};
 init([]) ->
   {ok, undefined}.
 

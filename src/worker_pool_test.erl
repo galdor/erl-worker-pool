@@ -34,6 +34,7 @@ pool_test_() ->
    end,
    [fun start_stop/0,
     fun stop/0,
+    fun worker_init_error/0,
     fun with_worker/0,
     fun with_worker_kill/0,
     fun with_worker_crash/0,
@@ -57,6 +58,11 @@ stop() ->
   worker_pool:stop(Pool),
   ?assertNot(is_process_alive(W1)),
   ?assertNot(is_process_alive(W2)).
+
+worker_init_error() ->
+  Pool = test_pool([{error, test}], #{}),
+  ?assertEqual({error, test}, worker_pool:acquire(worker_pool_test)),
+  worker_pool:stop(Pool).
 
 with_worker() ->
   Pool = test_pool([], #{max_nb_workers => 10}),

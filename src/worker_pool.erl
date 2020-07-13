@@ -125,9 +125,13 @@ handle_call(acquire, _From,
                            free_workers = [],
                            busy_workers = BusyWorkers}) when
     length(BusyWorkers) < MaxNbWorkers ->
-  {ok, Worker} = M:start_link(A),
-  State2 = State#state{busy_workers = [Worker | BusyWorkers]},
-  {reply, {ok, Worker}, State2};
+  case M:start_link(A) of
+    {ok, Worker} ->
+      State2 = State#state{busy_workers = [Worker | BusyWorkers]},
+      {reply, {ok, Worker}, State2};
+    {error, Reason} ->
+      {reply, {error, Reason}, State}
+  end;
 handle_call(acquire, From, State = #state{free_workers = [],
                                           requests = Requests}) ->
   #{request_timeout := Delay} = State#state.options,
